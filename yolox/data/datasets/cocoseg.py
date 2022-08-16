@@ -51,8 +51,7 @@ class COCODataset(Dataset):
         data_dir=None,
         json_file="instances_train2017.json",
         name="train2017",
-        roadgt="roadgt",
-        # img_size=(416, 416),
+        roadgt="trainroad",
         img_size=(640, 640),
         preproc=None,
         cache=False,
@@ -163,6 +162,7 @@ class COCODataset(Dataset):
         # #seg mask 
         # for mask in tqdm((list.mask_list)):
         #     mask_path
+
         
         im_ann = self.coco.loadImgs(id_)[0]
         width = im_ann["width"]
@@ -203,11 +203,14 @@ class COCODataset(Dataset):
         # print(res)
 
         r = min(self.img_size[0] / height, self.img_size[1] / width)
+
         res[:, :4] *= r
 
         img_info = (height, width)
         resized_info = (int(height * r), int(width * r))
         # resized_info = (192,640)
+        # print(img_info)
+        # print(resized_info)
 
 
 
@@ -240,7 +243,7 @@ class COCODataset(Dataset):
 
         # img = cv2.resize(img, (int(w0 * r), int(h0 * r)), interpolation=interp)	
         seg_label = cv2.resize(seg_label, (int(width * r), int(height * r)), interpolation=interp)	
-        # seg_label = cv2.resize(seg_label, (int(640), int(192)), interpolation=interp)	
+        # seg_label = cv2.resize(seg_label, (int(640), int(384)), interpolation=interp)	
 
 
 
@@ -269,7 +272,7 @@ class COCODataset(Dataset):
 
         # resized_img = cv2.resize(
         #     img,
-        #     (640,192),
+        #     (640,384),
         #     interpolation=cv2.INTER_LINEAR,
         # ).astype(np.uint8)
 
@@ -314,18 +317,24 @@ class COCODataset(Dataset):
         h0,w0 = img_info
         h,w = resized_info
 
-        print(img.shape)
-        print(h0,w0)
-        print(h,w)
+        # print(img.shape)
+        # print(h0,w0)
+        # print(h,w)
 
 
+
+        # cv2.imwrite("datasets/org_img.jpg", seg_label)
 
         (img,  seg_label), ratio, pad = letterbox((img,  seg_label),  resized_info, auto=True, scaleup=self.is_train)	
+        # print(img.shape, seg_label.shape)
         shapes = (h0, w0), ((h / h0, w / w0), pad)  # for COCO mAP 
+        # cv2.imwrite("datasets/padd_img.jpg", seg_label)
 
-        print(img.shape)
+        # print(shapes)
+
+        # print(img.shape) 
         
-        print("----------")
+        # print("----------")
 
 
 
@@ -343,7 +352,9 @@ class COCODataset(Dataset):
         # Convert
         # img = img[:, :, ::-1].transpose(2, 0, 1)  # BGR to RGB, to 3x416x416
         # img = img.transpose(2, 0, 1)
+
         img = np.ascontiguousarray(img)
+
         # seg_label = np.ascontiguousarray(seg_label)
         # if idx == 0:
         #     print(seg_label[:,:,0])

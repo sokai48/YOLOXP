@@ -87,8 +87,15 @@
 
 
 
+# COCO_CLASSES = (
+#      "Car",
+#      "Pedestrian",
+#      "Cyclist",
+#  )
+
 COCO_CLASSES = (
-     "Car",
-     "Pedestrian",
-     "Cyclist",
- )
+    "car",
+    "bus",
+    "truck",
+    "train",
+)

@@ -134,6 +134,8 @@ class YOLOPAFPN(nn.Module):
         """
 
         #  backbone
+
+        # print(input.shape)
         out_features = self.backbone(input)
         features = [out_features[f] for f in self.in_features]
         [x2, x1, x0] = features

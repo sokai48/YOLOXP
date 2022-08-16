@@ -37,15 +37,12 @@ class Exp(MyExp):
         #576 1024
         #288 512
 
-        self.input_size = (576, 1024) 
-        self.test_size = (576, 1024)
+        # self.input_size = (576, 1024) 
+        # self.test_size = (576, 1024)
 
-        # self.input_size = (288, 512) 
-        # self.test_size = (288, 512) 
+        self.input_size = (288, 512) 
+        self.test_size = (288, 512) 
 
-
-        # self.input_size = (640,640)
-        # self.test_size = (640,640)
 
         self.img_channel = 3
 

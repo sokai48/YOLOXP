@@ -211,13 +211,16 @@ class COCOEvaluator:
         da_mIoU_seg = AverageMeter()
         """
 
+        print(enumerate(progress_bar(self.dataloader)))
+        print(self.dataloader.dataset.coco)
         for cur_iter, (imgs, _, info_imgs, ids, _) in enumerate(
             progress_bar(self.dataloader)
         ):
-            print(self.dataloader)
-            print(cur_iter)
             print(imgs.shape)
 
+            print(info_imgs)
+
+            print(ids)
 
             with torch.no_grad():
                 imgs = imgs.type(tensor_type)
@@ -311,6 +314,8 @@ class COCOEvaluator:
         # logger.info(s)
         #from v5 https://zhuanlan.zhihu.com/p/499759736
 
+        print(eval_results)
+
         return eval_results
 
     def convert_to_coco_format(self, outputs, info_imgs, ids):
@@ -396,6 +401,8 @@ class COCOEvaluator:
 
 
 
+            print(cocoGt)
+            print(cocoDt)
             cocoEval = COCOeval(cocoGt, cocoDt, annType[1])
             cocoEval.evaluate()
             cocoEval.accumulate()
@@ -424,8 +431,9 @@ class COCOEvaluator:
             # return cocoEval.stats[0], cocoEval.stats[1], info, AP_per_class, AR_per_class
             return cocoEval.stats[0], cocoEval.stats[1], info 
         else:
-            return 0, 0, info
             # return 0, 0, info, [], []
+            return 0, 0, info
+           
 
 
 class AverageMeter(object):

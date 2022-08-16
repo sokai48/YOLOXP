@@ -18,6 +18,7 @@ import numpy as np
 
 from yolox.utils import xyxy2cxcywh
 import torchvision.transforms as transforms
+from yolox.utils.augmentations import letterbox_for_img
 
 
 def augment_hsv(img, hgain=5, sgain=30, vgain=30):
@@ -53,6 +54,7 @@ def get_affine_matrix(
     shear=10,
 ):
     twidth, theight = target_size
+
 
     # Rotation and Scale
     angle = get_aug_params(degrees)
@@ -164,16 +166,23 @@ def _mirror(image, boxes, segs, prob=0.5):
 
 def preproc(img, input_size, seg_target, swap=(2, 0, 1)):
 
-    h, w, c = img.shape
+
+    # print(img.shape)
+
+
     if len(img.shape) == 3:
         padded_img = np.ones((input_size[0], input_size[1], 3), dtype=np.uint8) * 114
     else:
         padded_img = np.ones(input_size, dtype=np.uint8) * 114
 
+
+    # print(padded_img.shape)
+
+
+
     r = min(input_size[0] / img.shape[0], input_size[1] / img.shape[1])
-    print("------")
-    print(r)
-    print("------")
+
+    # print(r)
 
 
     resized_img = cv2.resize(
@@ -181,11 +190,43 @@ def preproc(img, input_size, seg_target, swap=(2, 0, 1)):
         (int(img.shape[1] * r), int(img.shape[0] * r)),
         interpolation=cv2.INTER_LINEAR,
     ).astype(np.uint8)
+
+    # print(resized_img.shape)
+
     padded_img[: int(img.shape[0] * r), : int(img.shape[1] * r)] = resized_img
-    
+
+    # print(padded_img.shape)
+
     padded_img = padded_img.transpose(swap)
     padded_img = np.ascontiguousarray(padded_img, dtype=np.float32)
 
+    '''
+    h0, w0 = img.shape[:2]
+    if (h0 != 384 and w0 != 640 ) : #代表沒有被letter box轉換過
+        
+        # Padded resize
+        # print(img.shape)
+        img, ratio, pad = letterbox_for_img(img, (640,640), auto=True)
+        # print(img.shape)
+        h, w = img.shape[:2]
+        # shapes = (h0, w0), ((h / h0, w / w0), pad)
+
+        r = min(h / h0, w / w0)
+
+        # print(r)
+    
+    else : 
+
+        r = 1
+
+    '''
+
+
+    # Convert
+    #img = img[:, :, ::-1].transpose(2, 0, 1)  # BGR to RGB, to 3x416x416
+    # padded_img = img.transpose(swap)
+    # padded_img = np.ascontiguousarray(padded_img, dtype=np.float32)
+    # print(padded_img.shape)
     # print(len(seg_target))
     # print(seg_target.shape)
 
@@ -217,7 +258,7 @@ def preproc(img, input_size, seg_target, swap=(2, 0, 1)):
     print(type(padded_seg))
 
     '''
-    print(padded_img.shape)
+    # print(padded_img.shape)
     # print(padded_seg.shape)
     padded_seg = seg_target
 
@@ -256,8 +297,8 @@ class TrainTransform:
 
             image, r_o, seg_targets = preproc(image, input_dim, seg_targets)
 
-
-                    #處理seg_label  將圖片轉換成np.arrary再轉換成tensor
+            '''
+            #處理seg_label  將圖片轉換成np.arrary再轉換成tensor
             seg_label = seg_targets
             _,h,w = seg_label.shape
             if self.segcls == 3:
@@ -283,6 +324,8 @@ class TrainTransform:
                 seg_label = torch.stack((seg2[0], seg1[0]),0)
             
             seg_targets = seg_label.numpy()
+
+            '''
 
 
 
@@ -453,4 +496,6 @@ class ValTransform:
             img /= 255.0
             img -= np.array([0.485, 0.456, 0.406]).reshape(3, 1, 1)
             img /= np.array([0.229, 0.224, 0.225]).reshape(3, 1, 1)
+    
+
         return img, np.zeros((1, 5)), np.array([])

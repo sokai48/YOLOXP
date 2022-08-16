@@ -9,6 +9,8 @@ import warnings
 from loguru import logger
 
 import sys
+print(sys.path)
+sys.path.remove('/home/lab602.10977014_0n1/.pipeline2/10977014/YOLOX')
 sys.path.append("/home/lab602.10977014_0n1/.pipeline/10977014/YOLOXP/")
 
 import torch
@@ -35,7 +37,7 @@ def make_parser():
         type=str,
         help="url used to set up distributed training",
     )
-    parser.add_argument("-b", "--batch-size", type=int, default=32, help="batch size")
+    parser.add_argument("-b", "--batch-size", type=int, default=8, help="batch size")
     parser.add_argument(
         "-d", "--devices", default=1, type=int, help="device for training"
     )
@@ -48,12 +50,12 @@ def make_parser():
     parser.add_argument(
         "-f",
         "--exp_file",
-        default=None,
+        default="exps/example/custom/yolox_s_seg.py",
         type=str,
         help="pls input your expriment description file",
     )
-    parser.add_argument("-c", "--ckpt", default="YOLOX_outputs/yolox_s_seg_5000_nohsv/", type=str, help="ckpt for eval")
-    parser.add_argument("--conf", default=None, type=float, help="test conf")
+    parser.add_argument("-c", "--ckpt", default="YOLOX_outputs/yolox_s_seg_paper/latest_ckpt.pth", type=str, help="ckpt for eval")
+    parser.add_argument("--conf", default="0.001", type=float, help="test conf")
     parser.add_argument("--nms", default=None, type=float, help="test nms threshold")
     parser.add_argument("--tsize", default=None, type=int, help="test img size")
     parser.add_argument("--seed", default=None, type=int, help="eval seed")

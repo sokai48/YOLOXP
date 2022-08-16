@@ -12,6 +12,7 @@ import torch.backends.cudnn as cudnn
 
 import sys
 # print(sys.path)
+sys.path.remove('/home/lab602.10977014_0n1/.pipeline2/10977014/YOLOX')
 sys.path.append("/home/lab602.10977014_0n1/.pipeline/10977014/YOLOXP/")
 
 from yolox.core import Trainer, launch
@@ -34,21 +35,21 @@ def make_parser():
         type=str,
         help="url used to set up distributed training",
     )
-    parser.add_argument("-b", "--batch-size", type=int, default=1, help="batch size")
+    parser.add_argument("-b", "--batch-size", type=int, default=16, help="batch size")
     parser.add_argument(
         "-d", "--devices", default=1, type=int, help="device for training"
     )
     parser.add_argument(
         "-f",
         "--exp_file",
-        default="exps/example/custom/yolox_s_seg.py",
+        default="exps/example/custom/newbdd2_1_yolox_l_seg.py",
         type=str,
         help="plz input your experiment description file",
     )
     parser.add_argument(
-        "--resume", default=False, action="store_true", help="resume training"
+        "--resume", default=True, action="store_true", help="resume training"
     )
-    parser.add_argument("-c", "--ckpt", default="weight/latest_ckpt_Yoloxt_pretrained.pth",type=str, help="checkpoint file")
+    parser.add_argument("-c", "--ckpt", default="YOLOX_outputs/newbdd2_1_yolox_l_seg/last_epoch_ckpt.pth",type=str, help="checkpoint file")
     parser.add_argument(
         "-e",
         "--start_epoch",

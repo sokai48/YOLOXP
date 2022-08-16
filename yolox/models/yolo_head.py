@@ -518,8 +518,8 @@ class YOLOXHead(nn.Module):
             # print(z_target.shape)
             obj_targets.append(obj_target.to(dtype))
             if self.segcls > 0 :
+                # print(seg_target.shape)
                 seg_targets.append(seg_target.unsqueeze(0))
-                # print(seg_targets.shape)
             fg_masks.append(fg_mask)
             if self.use_l1:
                 l1_targets.append(l1_target)
@@ -578,15 +578,14 @@ class YOLOXHead(nn.Module):
 
 
 
-            # print(seg_targets)
             # print(seg_targets.view(-1))
             # print(seg_output)
             # print(seg_output.view(-1))
 
             seg_targets=seg_targets.to(device=torch.device('cuda' ))
 
-            print(seg_output.shape)
-            print(seg_targets.shape)
+            # print(seg_output.shape)
+            # print(seg_targets.shape)
 
 
             loss_seg = (

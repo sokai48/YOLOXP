@@ -9,8 +9,8 @@ from yolox.exp import Exp as MyExp
 class Exp(MyExp):
     def __init__(self):
         super(Exp, self).__init__()
-        self.depth = 0.33
-        self.width = 0.50
+        self.depth = 1
+        self.width = 1
         self.exp_name = os.path.split(os.path.realpath(__file__))[1].split(".")[0]
 
         # Define yourself dataset path
@@ -37,15 +37,12 @@ class Exp(MyExp):
         #576 1024
         #288 512
 
-        self.input_size = (576, 1024) 
-        self.test_size = (576, 1024)
+        # self.input_size = (576, 1024) 
+        # self.test_size = (576, 1024)
 
-        # self.input_size = (288, 512) 
-        # self.test_size = (288, 512) 
+        self.input_size = (288, 512) 
+        self.test_size = (288, 512) 
 
-
-        # self.input_size = (640,640)
-        # self.test_size = (640,640)
 
         self.img_channel = 3
 

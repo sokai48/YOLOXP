@@ -9,7 +9,6 @@ import warnings
 from loguru import logger
 
 import sys
-sys.path.remove('/home/lab602.10977014_0n1/.pipeline2/10977014/YOLOX')
 sys.path.append("/home/lab602.10977014_0n1/.pipeline/10977014/YOLOXP/")
 
 import torch
@@ -19,12 +18,10 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from yolox.core import launch
 from yolox.exp import get_exp
 from yolox.utils import configure_nccl, fuse_model, get_local_rank, get_model_info, setup_logger
+from tools.function import validate
 
-# import matplotlib相關套件
-import matplotlib.pyplot as plt
-
-# import字型管理套件
-from matplotlib.font_manager import FontProperties
+import numpy as np
+from yolox.evaluators.evaluate import ConfusionMatrix,SegmentationMetric
 
 
 def make_parser():
@@ -42,7 +39,7 @@ def make_parser():
         type=str,
         help="url used to set up distributed training",
     )
-    parser.add_argument("-b", "--batch-size", type=int, default=4, help="batch size")
+    parser.add_argument("-b", "--batch-size", type=int, default=8, help="batch size")
     parser.add_argument(
         "-d", "--devices", default=1, type=int, help="device for training"
     )
@@ -59,7 +56,7 @@ def make_parser():
         type=str,
         help="pls input your expriment description file",
     )
-    parser.add_argument("-c", "--ckpt", default="YOLOX_outputs/yolox_s_seg_paper/", type=str, help="ckpt for eval")
+    parser.add_argument("-c", "--ckpt", default="YOLOX_outputs/yolox_s_seg_288512/latest_ckpt.pth", type=str, help="ckpt for eval")
     parser.add_argument("--conf", default="0.001", type=float, help="test conf")
     parser.add_argument("--nms", default=None, type=float, help="test nms threshold")
     parser.add_argument("--tsize", default=None, type=int, help="test img size")
@@ -114,8 +111,13 @@ def make_parser():
     )
     return parser
 
+def fitness(x):
+    # Returns fitness (for use with results.txt or evolve.txt)
+    w = [0.0, 0.0, 0.1, 0.9]  # weights for [P, R, mAP@0.5, mAP@0.5:0.95]
+    return (x[:, :4] * w).sum(1)
 
-@logger.catch
+
+
 def main(exp, args, num_gpu):
     if args.seed is not None:
         random.seed(args.seed)
@@ -132,6 +134,7 @@ def main(exp, args, num_gpu):
     cudnn.benchmark = True
 
     rank = get_local_rank()
+    rank = 1
 
     file_name = os.path.join(exp.output_dir, args.experiment_name)
 
@@ -152,130 +155,72 @@ def main(exp, args, num_gpu):
     logger.info("Model Summary: {}".format(get_model_info(model, exp.test_size)))
     logger.info("Model Structure:\n{}".format(str(model)))
 
-    evaluator = exp.get_evaluator(args.batch_size, is_distributed, args.test, args.legacy)
-    evaluator.per_class_AP = True
-    evaluator.per_class_AR = True
+    # evaluator = exp.get_evaluator(args.batch_size, is_distributed, args.test, args.legacy)
+    eval_loader = exp.get_eval_loader(args.batch_size, is_distributed, args.test, args.legacy)
+    print('load data finished')
 
     torch.cuda.set_device(rank)
     model.cuda(rank)
-    model.eval()
+
 
     if not args.speed and not args.trt:
-        # if args.ckpt is None:
-        #     ckpt_file = os.path.join(file_name, "best_ckpt.pth")
-        # else:
-        ckpt_root = args.ckpt
+        if args.ckpt is None:
+            ckpt_file = os.path.join(file_name, "best_ckpt.pth")
+        else:
+            ckpt_file = args.ckpt
+        logger.info("loading checkpoint from {}".format(ckpt_file))
+        loc = "cuda:{}".format(rank)
+        ckpt = torch.load(ckpt_file, map_location=loc)
+        model.load_state_dict(ckpt["model"])
+        logger.info("loaded checkpoint done.")
 
-    # for ckpt_file in os.listdir(ckpt_root) :
-    
-    path_list = os.listdir(ckpt_root)
-    path_list.sort(key = lambda x: (len(x),x))
+    if is_distributed:
+        model = DDP(model, device_ids=[rank])
 
-    ap_list = []
-    ar_list = []
+    if args.fuse:
+        logger.info("\tFusing model...")
+        model = fuse_model(model)
 
-    epoch_num = 0
-    epoch_name = []
-    
-    for filename in path_list :   
-        if filename[:5] == "epoch" :
-            epoch_num += 10
-            epoch_name.append(epoch_num)
-            ckpt_file = os.path.join(ckpt_root, filename)
-            print(ckpt_file)
-            logger.info("loading checkpoint from {}".format(ckpt_file))
-            loc = "cuda:{}".format(rank)
-            ckpt = torch.load(ckpt_file, map_location=loc)
-            model.load_state_dict(ckpt["model"])
-            logger.info("loaded checkpoint done.")
+    if args.trt:
+        assert (
+            not args.fuse and not is_distributed and args.batch_size == 1
+        ), "TensorRT model is not support model fusing and distributed inferencing!"
+        trt_file = os.path.join(file_name, "model_trt.pth")
+        assert os.path.exists(
+            trt_file
+        ), "TensorRT model is not found!\n Run tools/trt.py first!"
+        model.head.decode_in_inference = False
+        decoder = model.head.decode_outputs
+    else:
+        trt_file = None
+        decoder = None
 
-            if is_distributed:
-                model = DDP(model, device_ids=[rank])
+    epoch = 0 #special for test
+    # da_segment_results,ll_segment_results,detect_results, total_loss,maps, times = validate(
+    #     epoch,cfg, valid_loader, valid_dataset, model, criterion,
+    #     final_output_dir, tb_log_dir, writer_dict,
+    #     logger, device
+    # )
 
-            if args.fuse:
-                logger.info("\tFusing model...")
-                model = fuse_model(model)
-
-            if args.trt:
-                assert (
-                    not args.fuse and not is_distributed and args.batch_size == 1
-                ), "TensorRT model is not support model fusing and distributed inferencing!"
-                trt_file = os.path.join(file_name, "model_trt.pth")
-                assert os.path.exists(
-                    trt_file
-                ), "TensorRT model is not found!\n Run tools/trt.py first!"
-                model.head.decode_in_inference = False
-                decoder = model.head.decode_outputs
-            else:
-                trt_file = None
-                decoder = None
-
-            # start evaluate
-            *_, summary, ap, ar = evaluator.evaluate(
-                model, is_distributed, args.fp16, trt_file, decoder, exp.test_size
-            )
-
-            print(summary)
-
-            ap_list.append(ap)
-            ar_list.append(ar)
-            logger.info("\n" + summary)
+    da_segment_results,ll_segment_results,detect_results, total_loss,maps, times = validate(
+        epoch, args, eval_loader, model, logger, loc  )
 
 
- 
-    ap_0 = []
-    ap_1 = []
-    ap_2 = []
-    map = []
-    ar_0 = []
-    ar_1 = []
-    ar_2 = [] 
+    # fi = fitness(np.array(detect_results).reshape(1, -1))
+    msg =   'Test:    Loss({loss:.3f})\n' \
+            'Driving area Segment: Acc({da_seg_acc:.3f})    IOU ({da_seg_iou:.3f})    mIOU({da_seg_miou:.3f})\n' \
+                      'Lane line Segment: Acc({ll_seg_acc:.3f})    IOU ({ll_seg_iou:.3f})  mIOU({ll_seg_miou:.3f})\n' \
+                      'Detect: P({p:.3f})  R({r:.3f})  mAP@0.5({map50:.3f})  mAP@0.5:0.95({map:.3f})\n'\
+                      'Time: inference({t_inf:.4f}s/frame)  nms({t_nms:.4f}s/frame)'.format(
+                          loss=total_loss, da_seg_acc=da_segment_results[0],da_seg_iou=da_segment_results[1],da_seg_miou=da_segment_results[2],
+                          ll_seg_acc=ll_segment_results[0],ll_seg_iou=ll_segment_results[1],ll_seg_miou=ll_segment_results[2],
+                          p=detect_results[0],r=detect_results[1],map50=detect_results[2],map=detect_results[3],
+                          t_inf=times[0], t_nms=times[1])
+    logger.info(msg)
+    print("test finish")
 
 
-    print(path_list)
 
-    for i in range(len(ap_list)) :
-        ap_0.append(ap_list[i]['0'])
-        ap_1.append(ap_list[i]['1'])
-        ap_2.append(ap_list[i]['2'])
-        map.append((ap_list[i]['0']+ ap_list[i]['1'] + ap_list[i]['2'])/3)
-        ar_0.append(ap_list[i]['0'])
-        ar_1.append(ap_list[i]['1'])
-        ar_2.append(ap_list[i]['2'])
-        # ap_2
-        # ar_0
-        # ar_1
-        # ar_2
-
-    print("===============================")
-    print(path_list)
-    print(map)
-    print("================================")
-
-    plt.figure(figsize=(15,10),dpi=100,linewidth = 2)
-    # plt.plot(epoch_name,ap_0,'s-',color = 'b', label="Car")
-    # plt.plot( epoch_name,ap_1,'o-',color = 'g', label="Pesterian")
-    # plt.plot( epoch_name,ap_2,'x-',color = 'y', label="Cyclist")
-    plt.plot( epoch_name,map,'d-',color = 'r', label="map")
-    plt.title("ap of every epoch", fontsize=30, x=0.5, y=1.03)
-
-    # 设置刻度字体大小
-    plt.xticks(fontsize=20)
-    plt.yticks(fontsize=20)
-
-    # 標示x軸(labelpad代表與圖片的距離)
-    plt.xlabel("epoch", fontsize=30, labelpad = 15)
-
-    # 標示y軸(labelpad代表與圖片的距離)
-    plt.ylabel("ap_per_class(%)", fontsize=30, labelpad = 20)
-
-    # 顯示出線條標記位置
-    plt.legend(loc = "best", fontsize=20)
-
-    plt.savefig('evaluate_output/plot.png')
-
-    
-            
 
 
 if __name__ == "__main__":
@@ -287,6 +232,7 @@ if __name__ == "__main__":
         args.experiment_name = exp.exp_name
 
     num_gpu = torch.cuda.device_count() if args.devices is None else args.devices
+    
     assert num_gpu <= torch.cuda.device_count()
 
     dist_url = "auto" if args.dist_url is None else args.dist_url
@@ -299,3 +245,5 @@ if __name__ == "__main__":
         dist_url=dist_url,
         args=(exp, args, num_gpu),
     )
+
+
